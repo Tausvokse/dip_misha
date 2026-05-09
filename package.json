@@ -1,0 +1,26 @@
+{
+  "name": "parking-reservation-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Full-stack parking reservation system with React/Vite client and Express/Prisma server.",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "client:dev": "npm --workspace client run dev",
+    "client:build": "npm --workspace client run build",
+    "client:lint": "npm --workspace client run lint",
+    "server:dev": "npm --workspace server run dev",
+    "server:build": "npm --workspace server run build",
+    "server:lint": "npm --workspace server run lint",
+    "server:start": "npm --workspace server run start",
+    "server:prisma:generate": "npm --workspace server run prisma:generate",
+    "server:prisma:migrate": "npm --workspace server run prisma:migrate",
+    "server:prisma:deploy": "npm --workspace server run prisma:deploy",
+    "server:seed": "npm --workspace server run seed",
+    "build": "npm run server:build && npm run client:build",
+    "lint": "npm run server:lint && npm run client:lint"
+  }
+}
