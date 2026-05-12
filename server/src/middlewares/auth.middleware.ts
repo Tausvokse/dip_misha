@@ -1,5 +1,6 @@
+import { Role } from "../types/enums";
 ﻿import jwt from "jsonwebtoken";
-import { Role } from "@prisma/client";
+
 import { env } from "../config/env.config";
 import { prisma } from "../config/prisma.client";
 import { asyncHandler } from "../utils/catchAsync";
@@ -28,14 +29,13 @@ async function readUserFromToken(token: string) {
   const payload = jwt.verify(token, env.JWT_SECRET) as TokenPayload;
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { id: true, email: true, role: true },
-  });
+    select: { id: true, email: true, role: true } });
 
   if (!user) {
     throw createHttpError(401, "AUTH_USER_NOT_FOUND", "Authenticated user does not exist");
   }
 
-  return user;
+  return { ...user, role: user.role as Role };
 }
 
 export const authenticate = asyncHandler(async (req, _res, next) => {

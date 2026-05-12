@@ -9,7 +9,7 @@ import { serializeUser } from "../utils/serializers";
 type AuthUser = {
   id: string;
   email: string;
-  role: "USER" | "ADMIN";
+  role: string;
 };
 
 function signToken(user: AuthUser) {

@@ -1,9 +1,9 @@
-﻿import {
+﻿import { Prisma } from "@prisma/client";
+import {
   ParkingSpotStatus,
-  Prisma,
   ReservationStatus,
   Role,
-} from "@prisma/client";
+} from "../types/enums";
 import { env } from "../config/env.config";
 import { prisma } from "../config/prisma.client";
 import { calculateBillingQuote } from "./billing.service";
@@ -60,7 +60,7 @@ function canAccessReservation(actor: Actor, reservationUserId: string) {
   return actor.role === Role.ADMIN || actor.id === reservationUserId;
 }
 
-function spotUnavailableError(status: ParkingSpotStatus) {
+function spotUnavailableError(status: string) {
   if (status === ParkingSpotStatus.LOCKED) {
     return createHttpError(
       409,

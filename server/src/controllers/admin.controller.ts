@@ -1,4 +1,5 @@
-﻿import { ParkingSpotStatus, ReservationStatus } from "@prisma/client";
+import { ParkingSpotStatus, ReservationStatus } from "../types/enums";
+﻿
 import { z } from "zod";
 import { prisma } from "../config/prisma.client";
 import { asyncHandler } from "../utils/catchAsync";
@@ -6,8 +7,7 @@ import { serializeReservation, serializeSpot } from "../utils/serializers";
 
 export const adminReservationsQuerySchema = z.object({
   status: z.nativeEnum(ReservationStatus).optional(),
-  limit: z.coerce.number().int().positive().max(100).optional().default(50),
-});
+  limit: z.coerce.number().int().positive().max(100).optional().default(50) });
 
 function startOfDay(date: Date) {
   const result = new Date(date);
@@ -25,17 +25,12 @@ async function revenueBetween(from: Date, to: Date) {
   const aggregate = await prisma.reservation.aggregate({
     where: {
       status: {
-        in: [ReservationStatus.RESERVED, ReservationStatus.COMPLETED],
-      },
+        in: [ReservationStatus.RESERVED, ReservationStatus.COMPLETED] },
       paidAt: {
         gte: from,
-        lt: to,
-      },
-    },
+        lt: to } },
     _sum: {
-      totalPrice: true,
-    },
-  });
+      totalPrice: true } });
 
   return Number(aggregate._sum.totalPrice ?? 0);
 }
@@ -45,39 +40,33 @@ export const stats = asyncHandler(async (_req, res) => {
     prisma.parkingSpot.groupBy({
       by: ["status"],
       _count: {
-        _all: true,
-      },
-    }),
+        _all: true } }),
     prisma.reservation.groupBy({
       by: ["status"],
       _count: {
-        _all: true,
-      },
-    }),
+        _all: true } }),
     prisma.reservation.count(),
   ]);
 
-  const spotCounts = {
+  const spotCounts: Record<string, number> = {
     total: 0,
     FREE: 0,
     LOCKED: 0,
     RESERVED: 0,
-    MAINTENANCE: 0,
-  };
+    MAINTENANCE: 0 };
 
   for (const item of spots) {
     spotCounts[item.status] = item._count._all;
     spotCounts.total += item._count._all;
   }
 
-  const reservationCounts = {
+  const reservationCounts: Record<string, number> = {
     total: totalReservations,
     PENDING_PAYMENT: 0,
     RESERVED: 0,
     CANCELLED: 0,
     EXPIRED: 0,
-    COMPLETED: 0,
-  };
+    COMPLETED: 0 };
 
   for (const item of reservationsByStatus) {
     reservationCounts[item.status] = item._count._all;
@@ -101,12 +90,8 @@ export const stats = asyncHandler(async (_req, res) => {
             select: {
               id: true,
               email: true,
-              role: true,
-            },
-          },
-        },
-        orderBy: { createdAt: "desc" },
-      }),
+              role: true } } },
+        orderBy: { createdAt: "desc" } }),
     ]);
 
   const chart = [];
@@ -119,17 +104,13 @@ export const stats = asyncHandler(async (_req, res) => {
         where: {
           createdAt: {
             gte: from,
-            lt: to,
-          },
-        },
-      }),
+            lt: to } } }),
     ]);
 
     chart.push({
       date: from.toISOString().slice(0, 10),
       revenue,
-      reservations: reservationsCount,
-    });
+      reservations: reservationsCount });
   }
 
   res.json({
@@ -144,19 +125,16 @@ export const stats = asyncHandler(async (_req, res) => {
       currency: "UAH",
       today: todayRevenue,
       last7Days: weekRevenue,
-      last30Days: monthRevenue,
-    },
+      last30Days: monthRevenue },
     chart,
-    recentReservations: recentReservations.map(serializeReservation),
-  });
+    recentReservations: recentReservations.map(serializeReservation) });
 });
 
 export const reservations = asyncHandler(async (req, res) => {
   const reservationsList = await prisma.reservation.findMany({
     where: req.query.status
       ? {
-          status: req.query.status as ReservationStatus,
-        }
+          status: req.query.status as ReservationStatus }
       : undefined,
     take: Number(req.query.limit ?? 50),
     include: {
@@ -165,27 +143,20 @@ export const reservations = asyncHandler(async (req, res) => {
         select: {
           id: true,
           email: true,
-          role: true,
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+          role: true } } },
+    orderBy: { createdAt: "desc" } });
 
   res.json({
-    reservations: reservationsList.map(serializeReservation),
-  });
+    reservations: reservationsList.map(serializeReservation) });
 });
 
 export const spots = asyncHandler(async (_req, res) => {
   const spotsList = await prisma.parkingSpot.findMany({
-    orderBy: { number: "asc" },
-  });
+    orderBy: { number: "asc" } });
 
   res.json({
     spots: spotsList.map(serializeSpot),
-    statuses: Object.values(ParkingSpotStatus),
-  });
+    statuses: Object.values(ParkingSpotStatus) });
 });
 
 

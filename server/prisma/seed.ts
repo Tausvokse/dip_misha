@@ -1,12 +1,12 @@
 import bcrypt from "bcryptjs";
+import { PrismaClient } from "@prisma/client";
 import {
   ParkingSpotStatus,
-  PrismaClient,
   ReservationStatus,
   Role,
   PaymentMethodType,
   CardBrand,
-} from "@prisma/client";
+} from "../src/types/enums";
 
 const prisma = new PrismaClient();
 

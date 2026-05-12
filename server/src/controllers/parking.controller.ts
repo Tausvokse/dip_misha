@@ -1,4 +1,5 @@
-﻿import { ParkingSpotStatus, Role } from "@prisma/client";
+import { Role, ParkingSpotStatus } from "../types/enums";
+﻿
 import { z } from "zod";
 import { prisma } from "../config/prisma.client";
 import { emitParkingEvent } from "../sockets";
@@ -7,8 +8,7 @@ import { createHttpError } from "../utils/AppError";
 import { serializeSpot } from "../utils/serializers";
 
 export const idOrNumberParamsSchema = z.object({
-  idOrNumber: z.string().min(1),
-});
+  idOrNumber: z.string().min(1) });
 
 export const listSpotsQuerySchema = z.object({
   status: z
@@ -16,25 +16,20 @@ export const listSpotsQuerySchema = z.object({
       z.nativeEnum(ParkingSpotStatus),
       z.array(z.nativeEnum(ParkingSpotStatus)),
     ])
-    .optional(),
-});
+    .optional() });
 
 export const updateSpotStatusSchema = z.object({
   status: z.nativeEnum(ParkingSpotStatus),
-  force: z.boolean().optional().default(false),
-});
+  force: z.boolean().optional().default(false) });
 
 export const maintenanceSchema = z.object({
   enabled: z.boolean(),
-  force: z.boolean().optional().default(false),
-});
+  force: z.boolean().optional().default(false) });
 
 async function findSpotByIdOrNumber(idOrNumber: string) {
   const spot = await prisma.parkingSpot.findFirst({
     where: {
-      OR: [{ id: idOrNumber }, { number: idOrNumber }],
-    },
-  });
+      OR: [{ id: idOrNumber }, { number: idOrNumber }] } });
 
   if (!spot) {
     throw createHttpError(404, "SPOT_NOT_FOUND", "Parking spot was not found");
@@ -56,13 +51,9 @@ async function ensureSpotCanChangeStatus(
     where: {
       spotId,
       status: {
-        in: ["PENDING_PAYMENT", "RESERVED"],
-      },
+        in: ["PENDING_PAYMENT", "RESERVED"] },
       endTime: {
-        gt: new Date(),
-      },
-    },
-  });
+        gt: new Date() } } });
 
   if (activeReservation) {
     throw createHttpError(
@@ -85,31 +76,21 @@ export const listSpots = asyncHandler(async (req, res) => {
     where: statuses?.length
       ? {
           status: {
-            in: statuses as ParkingSpotStatus[],
-          },
-        }
+            in: statuses as ParkingSpotStatus[] } }
       : undefined,
     include: {
       reservations: {
         where: {
           status: {
-            in: ["PENDING_PAYMENT", "RESERVED"],
-          },
+            in: ["PENDING_PAYMENT", "RESERVED"] },
           endTime: {
-            gt: new Date(),
-          },
-        },
+            gt: new Date() } },
         include: {
-          vehicle: true,
-        },
+          vehicle: true },
         orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
+        take: 1 } },
     orderBy: {
-      number: "asc",
-    },
-  });
+      number: "asc" } });
 
   res.json({
     spots: spots.map((spot) => {
@@ -118,18 +99,15 @@ export const listSpots = asyncHandler(async (req, res) => {
         ...serializeSpot(spot),
         activeReservationId: activeReservation?.id ?? null,
         licensePlate: activeReservation?.vehicle?.licensePlate ?? null,
-        lockExpiresAt: activeReservation?.lockExpiresAt?.toISOString() ?? null,
-      };
+        lockExpiresAt: activeReservation?.lockExpiresAt?.toISOString() ?? null };
     }),
-    total: spots.length,
-  });
+    total: spots.length });
 });
 
 export const getSpot = asyncHandler(async (req, res) => {
   const spot = await findSpotByIdOrNumber(req.params.idOrNumber);
   res.json({
-    spot: serializeSpot(spot),
-  });
+    spot: serializeSpot(spot) });
 });
 
 export const updateSpotStatus = asyncHandler(async (req, res) => {
@@ -142,20 +120,17 @@ export const updateSpotStatus = asyncHandler(async (req, res) => {
 
   const updatedSpot = await prisma.parkingSpot.update({
     where: { id: spot.id },
-    data: { status: req.body.status },
-  });
+    data: { status: req.body.status } });
 
   const payload = {
     spot: serializeSpot(updatedSpot),
     reason: "ADMIN_STATUS_CHANGED",
-    serverTime: new Date().toISOString(),
-  };
+    serverTime: new Date().toISOString() };
   emitParkingEvent("spotUpdated", payload);
   emitParkingEvent("dashboardUpdated", payload);
 
   res.json({
-    spot: serializeSpot(updatedSpot),
-  });
+    spot: serializeSpot(updatedSpot) });
 });
 
 export const setMaintenance = asyncHandler(async (req, res) => {
@@ -172,20 +147,17 @@ export const setMaintenance = asyncHandler(async (req, res) => {
 
   const updatedSpot = await prisma.parkingSpot.update({
     where: { id: spot.id },
-    data: { status: nextStatus },
-  });
+    data: { status: nextStatus } });
 
   const payload = {
     spot: serializeSpot(updatedSpot),
     reason: req.body.enabled ? "MAINTENANCE_ENABLED" : "MAINTENANCE_DISABLED",
-    serverTime: new Date().toISOString(),
-  };
+    serverTime: new Date().toISOString() };
   emitParkingEvent("spotUpdated", payload);
   emitParkingEvent("dashboardUpdated", payload);
 
   res.json({
-    spot: serializeSpot(updatedSpot),
-  });
+    spot: serializeSpot(updatedSpot) });
 });
 
 
