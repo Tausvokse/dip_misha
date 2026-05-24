@@ -1,4 +1,4 @@
-﻿import { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import {
   ParkingSpotStatus,
   ReservationStatus,
@@ -249,7 +249,7 @@ export async function createReservationLock(
       throw createHttpError(404, "SPOT_NOT_FOUND", "Parking spot was not found");
     }
 
-    if (currentSpot.status !== ParkingSpotStatus.FREE) {
+    if (currentSpot.status === ParkingSpotStatus.MAINTENANCE) {
       throw spotUnavailableError(currentSpot.status);
     }
 
@@ -276,22 +276,28 @@ export async function createReservationLock(
       );
     }
 
-    const updatedSpot = await tx.parkingSpot.updateMany({
-      where: {
-        id: spot.id,
-        status: ParkingSpotStatus.FREE,
-      },
-      data: {
-        status: ParkingSpotStatus.LOCKED,
-      },
-    });
+    if (currentSpot.status === ParkingSpotStatus.FREE) {
+      const updatedSpot = await tx.parkingSpot.updateMany({
+        where: {
+          id: spot.id,
+          status: ParkingSpotStatus.FREE,
+        },
+        data: {
+          status: ParkingSpotStatus.LOCKED,
+        },
+      });
 
-    if (updatedSpot.count !== 1) {
-      throw createHttpError(
-        409,
-        "SPOT_NOT_AVAILABLE",
-        "Parking spot was taken by another request",
-      );
+      if (updatedSpot.count !== 1) {
+        throw createHttpError(
+          409,
+          "SPOT_NOT_AVAILABLE",
+          "Parking spot was taken by another request",
+        );
+      }
+    } else if (currentSpot.status === ParkingSpotStatus.LOCKED) {
+       // If it's already locked by someone else for payment, we can't book it even for the future easily, 
+       // or we could, but to be safe we reject.
+       throw spotUnavailableError(currentSpot.status);
     }
 
     const createdReservation = await tx.reservation.create({
@@ -324,10 +330,103 @@ export async function createReservationLock(
   };
 }
 
+export async function extendReservation(
+  userId: string,
+  reservationId: string,
+  durationMinutes: number,
+) {
+  const reservation = await prisma.reservation.findUnique({
+    where: { id: reservationId },
+    include: reservationInclude(),
+  });
+
+  if (!reservation) {
+    throw createHttpError(404, "RESERVATION_NOT_FOUND", "Reservation not found");
+  }
+
+  if (reservation.userId !== userId) {
+    throw createHttpError(403, "FORBIDDEN", "You can only extend your own reservations");
+  }
+
+  if (reservation.status !== ReservationStatus.RESERVED) {
+    throw createHttpError(400, "INVALID_STATUS", "Only active reservations can be extended");
+  }
+
+  const currentEndTime = reservation.endTime;
+  const newEndTime = new Date(currentEndTime.getTime() + durationMinutes * 60_000);
+
+  const overlappingReservation = await prisma.reservation.findFirst({
+    where: {
+      spotId: reservation.spotId,
+      status: {
+        in: activeReservationStatuses,
+      },
+      id: { not: reservation.id },
+      startTime: { lt: newEndTime },
+      endTime: { gt: currentEndTime },
+    },
+  });
+
+  if (overlappingReservation) {
+    throw createHttpError(
+      409,
+      "EXTENSION_OVERLAP",
+      "Cannot extend because the spot is booked by someone else for the requested time",
+    );
+  }
+
+  const extensionQuote = calculateBillingQuote({
+    startTime: currentEndTime,
+    endTime: newEndTime,
+  });
+
+  const updatedReservation = await prisma.$transaction(async (tx) => {
+    return tx.reservation.update({
+      where: { id: reservation.id },
+      data: {
+        endTime: newEndTime,
+        totalPrice: new Prisma.Decimal(
+          (reservation.totalPrice as any).toNumber() + extensionQuote.totalPrice
+        ),
+      },
+      include: reservationInclude(),
+    });
+  });
+
+  const updatedSpot = await prisma.parkingSpot.findUnique({
+    where: { id: reservation.spotId },
+    include: {
+      reservations: {
+        where: {
+          status: { in: activeReservationStatuses },
+          endTime: { gt: new Date() },
+        },
+        include: { vehicle: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  if (updatedSpot) {
+    const activeRes = updatedSpot.reservations[0];
+    emitParkingEvent("spotUpdated", {
+      ...serializeSpot(updatedSpot),
+      activeReservationId: activeRes?.id ?? null,
+      licensePlate: activeRes?.vehicle?.licensePlate ?? null,
+      lockExpiresAt: activeRes?.lockExpiresAt?.toISOString() ?? null,
+      freeAt: activeRes?.endTime?.toISOString() ?? null,
+    });
+  }
+
+  emitReservationState("reservationUpdated", updatedReservation);
+  return { reservation: serializeReservation(updatedReservation) };
+}
+
 export async function confirmReservationPayment(
   reservationId: string,
   actor: Actor,
-  input?: { paymentMethodId?: string | null },
+  input?: { paymentMethodId?: string | null; vehiclePlate?: string | null },
 ) {
   const existingReservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
@@ -395,6 +494,45 @@ export async function confirmReservationPayment(
       );
     }
 
+    let vehicleIdToSet = freshReservation.vehicleId;
+
+    if (input?.vehiclePlate) {
+      const normalizedPlate = input.vehiclePlate.trim().toUpperCase();
+      let vehicle = await tx.vehicle.findFirst({
+        where: { userId: actor.id, licensePlate: normalizedPlate },
+      });
+
+      if (!vehicle) {
+        vehicle = await tx.vehicle.create({
+          data: {
+            userId: actor.id,
+            licensePlate: normalizedPlate,
+            make: "Unknown",
+          },
+        });
+      }
+      vehicleIdToSet = vehicle.id;
+    }
+
+    if (vehicleIdToSet) {
+      const existingActiveReservation = await tx.reservation.findFirst({
+        where: {
+          vehicleId: vehicleIdToSet,
+          status: { in: activeReservationStatuses },
+          id: { not: reservationId },
+          endTime: { gt: new Date() },
+        },
+      });
+
+      if (existingActiveReservation) {
+        throw createHttpError(
+          409,
+          "VEHICLE_ALREADY_PARKED",
+          "Це авто вже має активне бронювання",
+        );
+      }
+    }
+
     await tx.parkingSpot.update({
       where: { id: freshReservation.spotId },
       data: { status: ParkingSpotStatus.RESERVED },
@@ -406,6 +544,7 @@ export async function confirmReservationPayment(
         status: ReservationStatus.RESERVED,
         paidAt: new Date(),
         paymentMethodId: input?.paymentMethodId ?? freshReservation.paymentMethodId,
+        vehicleId: vehicleIdToSet,
       },
       include: reservationInclude(),
     });
@@ -560,8 +699,8 @@ export async function listUserReservations(userId: string) {
   };
 }
 
-export async function getActiveReservation(userId: string) {
-  const reservation = await prisma.reservation.findFirst({
+export async function getActiveReservations(userId: string) {
+  const reservations = await prisma.reservation.findMany({
     where: {
       userId,
       status: {
@@ -576,7 +715,7 @@ export async function getActiveReservation(userId: string) {
   });
 
   return {
-    reservation: reservation ? serializeReservation(reservation) : null,
+    reservations: reservations.map(serializeReservation),
   };
 }
 

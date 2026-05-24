@@ -14,13 +14,13 @@ import { useParkingStore } from "@/store/parking.store";
 
 function ProtectedRoute({ children }: { children: ReactElement }) {
   const { user, token, isLoading } = useAuthStore();
-  const fetchActiveReservation = useParkingStore((state) => state.fetchActiveReservation);
+  const fetchActiveReservations = useParkingStore((state) => state.fetchActiveReservations);
 
   useEffect(() => {
     if (user && token) {
-      fetchActiveReservation();
+      fetchActiveReservations();
     }
-  }, [user, token, fetchActiveReservation]);
+  }, [user, token, fetchActiveReservations]);
 
   if (isLoading) {
     return (

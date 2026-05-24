@@ -6,6 +6,7 @@ export function processPayment(payload: {
   reservationId: string;
   providerPaymentId?: string;
   cardLast4?: string;
+  vehiclePlate?: string;
 }) {
   return api.post<ReservationResponse>("/payments/confirm", payload);
 }

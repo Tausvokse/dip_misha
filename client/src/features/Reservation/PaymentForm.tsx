@@ -12,9 +12,8 @@ export function PaymentForm({ onPaid, reservation: propReservation }: { onPaid: 
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const storeReservation = useParkingStore((state) => state.activeReservation);
-  
-  const reservation = propReservation || storeReservation;
+  const [errorMsg, setErrorMsg] = useState("");
+  const reservation = propReservation;
 
   useEffect(() => {
     api.get("/profile/vehicles").then(({ data }) => {
@@ -28,25 +27,34 @@ export function PaymentForm({ onPaid, reservation: propReservation }: { onPaid: 
 
   const submitPayment = async (method: string) => {
     if (!reservation) {
-      alert("Бронювання не знайдено");
+      setErrorMsg("Бронювання не знайдено");
       return;
     }
     
     if (!vehiclePlate.trim()) {
-      alert("Будь ласка, введіть номер автомобіля для бронювання");
+      setErrorMsg("Будь ласка, введіть номер автомобіля для бронювання");
       return;
     }
     
     setIsLoading(true);
+    setErrorMsg("");
     try {
       await processPayment({
         reservationId: reservation.id,
         cardLast4: method === "CARD" ? card.slice(-4) : "0000",
+        vehiclePlate: vehiclePlate,
       });
       setIsSuccess(true);
       setTimeout(() => onPaid(vehiclePlate), 2000);
-    } catch (error) {
-      alert("Помилка оплати. Спробуйте ще раз.");
+    } catch (error: any) {
+      const errData = error?.response?.data?.error;
+      if (errData?.code === "VEHICLE_ALREADY_PARKED") {
+        setErrorMsg("Це авто вже має активне бронювання на іншому місці!");
+      } else if (errData?.message) {
+        setErrorMsg(errData.message);
+      } else {
+        setErrorMsg("Помилка оплати. Спробуйте ще раз.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -129,6 +137,12 @@ export function PaymentForm({ onPaid, reservation: propReservation }: { onPaid: 
           Сплатити {reservation?.totalPrice} грн
         </Button>
       </div>
+      
+      {errorMsg && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm font-medium animate-in fade-in">
+          {errorMsg}
+        </div>
+      )}
     </div>
   );
 }

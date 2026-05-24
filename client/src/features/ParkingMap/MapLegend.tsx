@@ -2,6 +2,7 @@ const items = [
   ["bg-parking-free", "Вільне"],
   ["bg-parking-locked", "Оплата"],
   ["bg-parking-reserved", "Зайняте"],
+  ["bg-orange-400", "Черга"],
   ["bg-parking-maintenance", "Ремонт"],
 ];
 

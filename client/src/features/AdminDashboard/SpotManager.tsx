@@ -20,7 +20,7 @@ export function SpotManager({
       <h2 className="mb-4 text-lg font-bold text-white">Керування місцями</h2>
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-4">
         {spots.slice(0, 24).map((spot) => {
-          const isBusy = spot.status === "RESERVED" || spot.status === "LOCKED" || spot.status === "PENDING_PAYMENT";
+          const isBusy = spot.status === "RESERVED" || spot.status === "LOCKED";
           
           return (
             <div key={spot.id} className="rounded-lg bg-slate-950 p-3">

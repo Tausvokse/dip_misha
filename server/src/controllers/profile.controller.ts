@@ -2,7 +2,7 @@ import { PaymentMethodType, CardBrand } from "../types/enums";
 
 import { z } from "zod";
 import { prisma } from "../config/prisma.client";
-import { getActiveReservation, listUserReservations } from "../services/parking.service";
+import { getActiveReservations, listUserReservations } from "../services/parking.service";
 import { asyncHandler } from "../utils/catchAsync";
 import { createHttpError } from "../utils/AppError";
 import {
@@ -259,9 +259,9 @@ export const deletePaymentMethod = asyncHandler(async (req, res) => {
   res.status(204).send();
 });
 
-export const activeReservation = asyncHandler(async (req, res) => {
+export const activeReservations = asyncHandler(async (req, res) => {
   const userId = requireUserId(req.user);
-  const result = await getActiveReservation(userId);
+  const result = await getActiveReservations(userId);
   res.json(result);
 });
 

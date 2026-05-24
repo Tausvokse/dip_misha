@@ -2,7 +2,9 @@ import { BarChart3, Calendar, CreditCard, ParkingCircle, User } from "lucide-rea
 import { NavLink } from "react-router-dom";
 import { ActiveTimerInfo } from "@/features/Reservation/ActiveTimerInfo";
 import { useAuthStore } from "@/store/auth.store";
+import { useParkingStore } from "@/store/parking.store";
 import { cn } from "@/utils/classNames";
+import { useMemo } from "react";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -15,11 +17,24 @@ const linkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function Sidebar() {
   const user = useAuthStore((state) => state.user);
+  const activeReservations = useParkingStore((state) => state.activeReservations);
+
+  // For mobile Option A: Find the reservation that expires the soonest
+  const closestReservation = useMemo(() => {
+    if (!activeReservations.length) return null;
+    return activeReservations.reduce((closest, current) => {
+      const getTargetTime = (r: any) => {
+        const timeStr = r.status === "PENDING_PAYMENT" ? r.lockExpiresAt : r.endTime;
+        return timeStr ? new Date(timeStr).getTime() : Infinity;
+      };
+      return getTargetTime(current) < getTargetTime(closest) ? current : closest;
+    });
+  }, [activeReservations]);
 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex w-80 flex-col justify-between border-r-2 border-[#E5E7EB] bg-white p-6 shrink-0 shadow-sm relative z-20">
+      <aside className="hidden md:flex w-80 flex-col justify-between border-r-2 border-[#E5E7EB] bg-white p-6 shrink-0 shadow-sm relative z-20 h-screen overflow-y-auto">
         <nav className="flex flex-col gap-2">
           <NavLink to="/" className={linkClass}>
             <ParkingCircle className="h-5 w-5 md:h-4 md:w-4 shrink-0" />
@@ -44,8 +59,16 @@ export function Sidebar() {
             <span className="hidden md:inline">Профіль</span>
           </NavLink>
         </nav>
-        <div className="mt-8">
-          <ActiveTimerInfo />
+        <div className="mt-8 flex flex-col gap-4">
+          {activeReservations.length > 0 ? (
+            activeReservations.map(res => (
+              <ActiveTimerInfo key={res.id} reservation={res} />
+            ))
+          ) : (
+            <div className="rounded-2xl border-2 border-dashed border-[#E5E7EB] bg-[#F9FAFB] p-5 text-sm text-[#9CA3AF] text-center font-medium">
+              Активної броні немає
+            </div>
+          )}
         </div>
       </aside>
 
@@ -57,9 +80,13 @@ export function Sidebar() {
         <NavLink to="/reservations" className={linkClass}>
           <Calendar className="h-6 w-6 shrink-0" />
         </NavLink>
+        
         <div className="flex-1 max-w-[80px] -mt-10 px-2">
-           <ActiveTimerInfo mobile />
+           {closestReservation && (
+             <ActiveTimerInfo mobile reservation={closestReservation} />
+           )}
         </div>
+        
         <NavLink to="/payments" className={linkClass}>
           <CreditCard className="h-6 w-6 shrink-0" />
         </NavLink>

@@ -1,8 +1,8 @@
-import { Car, Lock, AlertTriangle, ShieldCheck } from "lucide-react";
+import { Car, Lock, AlertTriangle, ShieldCheck, Timer } from "lucide-react";
 import { cn } from "@/utils/classNames";
 import type { ParkingSpot, SpotStatus } from "@/types/parking.types";
 
-const statusStyles: Record<SpotStatus, { container: string; icon: any; label: string }> = {
+const statusStyles: Record<SpotStatus | "EXPIRING_SOON", { container: string; icon: any; label: string }> = {
   FREE: { 
     container: "bg-emerald-500/10 border-emerald-500/50 hover:bg-emerald-500/20 text-emerald-400", 
     icon: null, 
@@ -23,6 +23,11 @@ const statusStyles: Record<SpotStatus, { container: string; icon: any; label: st
     icon: AlertTriangle, 
     label: "Сервіс" 
   },
+  EXPIRING_SOON: {
+    container: "bg-orange-500/20 border-orange-500/50 hover:bg-orange-500/30 text-orange-400",
+    icon: Timer,
+    label: "Черга"
+  }
 };
 
 export function SpotItem({
@@ -34,8 +39,14 @@ export function SpotItem({
   onSelect: (spot: ParkingSpot) => void;
   position?: "top" | "bottom";
 }) {
-  const isFree = spot.status === "FREE";
-  const style = statusStyles[spot.status];
+  const freeAtDate = spot.freeAt ? new Date(spot.freeAt) : null;
+  const msToFree = freeAtDate ? freeAtDate.getTime() - Date.now() : 0;
+  const isExpiringSoon = spot.status === "RESERVED" && msToFree > 0 && msToFree <= 10 * 60 * 1000;
+  
+  const isClickable = spot.status === "FREE" || isExpiringSoon;
+  const effectiveStatus = isExpiringSoon ? "EXPIRING_SOON" : spot.status;
+  
+  const style = statusStyles[effectiveStatus];
   const Icon = style.icon;
 
   return (
@@ -43,10 +54,10 @@ export function SpotItem({
       className={cn(
         "flex w-20 md:w-24 h-32 md:h-40 flex-col items-center justify-between py-3 md:py-4 rounded-lg border-2 transition-all relative group shadow-sm",
         style.container,
-        isFree ? "cursor-pointer scale-100 hover:scale-105 hover:shadow-xl" : "cursor-not-allowed",
+        isClickable ? "cursor-pointer scale-100 hover:scale-105 hover:shadow-xl" : "cursor-not-allowed",
         position === "top" ? "border-b-[6px] md:border-b-8" : "border-t-[6px] md:border-t-8"
       )}
-      disabled={!isFree}
+      disabled={!isClickable}
       onClick={() => onSelect(spot)}
     >
       {/* Spot Number */}
@@ -63,7 +74,11 @@ export function SpotItem({
       <div className="flex-1 flex items-center justify-center w-full px-2">
         {spot.status === "RESERVED" ? (
           <div className="relative animate-in fade-in zoom-in duration-500">
-            <Car className="h-10 w-10 md:h-14 md:w-14 fill-current opacity-90" />
+            {isExpiringSoon ? (
+              <Timer className="h-10 w-10 md:h-14 md:w-14 text-orange-400 opacity-90" />
+            ) : (
+              <Car className="h-10 w-10 md:h-14 md:w-14 fill-current opacity-90" />
+            )}
             <ShieldCheck className="absolute -top-1 -right-1 h-4 w-4 md:h-5 md:w-5 text-emerald-400 fill-slate-900" />
           </div>
         ) : Icon ? (

@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import {
   cancel,
   getReservation,
@@ -8,6 +8,8 @@ import {
   quoteSchema,
   reservationIdParamsSchema,
   reservationLockSchema,
+  extend,
+  extendSchema,
 } from "../controllers/reservations.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 import { validate } from "../middlewares/validation.middleware";
@@ -60,5 +62,9 @@ reservationsRouter.post(
   }),
   confirmPaymentByParam,
 );
-
-
+reservationsRouter.post(
+  "/:id/extend",
+  authenticate,
+  validate({ params: reservationIdParamsSchema, body: extendSchema }),
+  extend,
+);

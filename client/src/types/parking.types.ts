@@ -16,6 +16,8 @@ export interface ParkingSpot {
   updatedAt?: string;
   activeReservationId?: string | null;
   lockExpiresAt?: string | null;
+  freeAt?: string | null;
+  licensePlate?: string | null;
 }
 
 export interface Reservation {

@@ -19,6 +19,7 @@ export function lockSpot(payload: {
   spotId?: string;
   spotNumber?: string;
   durationMinutes: number;
+  startTime?: string;
   promoCode?: string | null;
 }) {
   return api.post<ReservationResponse>("/reservations/lock", payload);

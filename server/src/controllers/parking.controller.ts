@@ -99,9 +99,12 @@ export const listSpots = asyncHandler(async (req, res) => {
         ...serializeSpot(spot),
         activeReservationId: activeReservation?.id ?? null,
         licensePlate: activeReservation?.vehicle?.licensePlate ?? null,
-        lockExpiresAt: activeReservation?.lockExpiresAt?.toISOString() ?? null };
+        lockExpiresAt: activeReservation?.lockExpiresAt?.toISOString() ?? null,
+        freeAt: activeReservation?.endTime?.toISOString() ?? null
+      };
     }),
-    total: spots.length });
+    total: spots.length
+  });
 });
 
 export const getSpot = asyncHandler(async (req, res) => {

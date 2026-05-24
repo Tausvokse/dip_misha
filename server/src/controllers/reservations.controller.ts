@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import {
   calculateBillingQuote,
 } from "../services/billing.service";
@@ -7,6 +7,7 @@ import {
   createReservationLock,
   getReservationById,
   listUserReservations,
+  extendReservation,
 } from "../services/parking.service";
 import { asyncHandler } from "../utils/catchAsync";
 import { createHttpError } from "../utils/AppError";
@@ -43,6 +44,10 @@ export const reservationLockSchema = reservationTimeSchema
 
 export const reservationIdParamsSchema = z.object({
   id: z.string().uuid(),
+});
+
+export const extendSchema = z.object({
+  durationMinutes: z.number().int().positive(),
 });
 
 function resolveQuoteTimes(input: {
@@ -115,4 +120,16 @@ export const cancel = asyncHandler(async (req, res) => {
   res.json(result);
 });
 
+export const extend = asyncHandler(async (req, res) => {
+  if (!req.user) {
+    throw createHttpError(401, "AUTH_TOKEN_REQUIRED", "Authorization Bearer token is required");
+  }
 
+  const { durationMinutes } = req.body;
+  if (!durationMinutes) {
+    throw createHttpError(400, "INVALID_INPUT", "durationMinutes is required");
+  }
+
+  const result = await extendReservation(req.user.id, req.params.id, durationMinutes);
+  res.json(result);
+});

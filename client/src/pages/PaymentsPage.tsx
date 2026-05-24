@@ -59,7 +59,7 @@ export function PaymentsPage() {
     return (
       <MainLayout>
         <div className="flex h-[60vh] items-center justify-center">
-          <Spinner size="lg" />
+          <Spinner />
         </div>
       </MainLayout>
     );
@@ -82,7 +82,7 @@ export function PaymentsPage() {
                   <CreditCard className="h-5 w-5 text-blue-600" />
                   Мої картки
                 </h2>
-                <Button variant="outline" size="sm" onClick={() => addMockPaymentMethod("CARD")} className="gap-2">
+                <Button variant="outline" onClick={() => addMockPaymentMethod("CARD")} className="gap-2 text-sm h-8 px-3">
                   <Plus className="h-4 w-4" /> Додати
                 </Button>
               </div>

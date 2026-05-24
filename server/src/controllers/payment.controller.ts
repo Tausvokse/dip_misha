@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 import { prisma } from "../config/prisma.client";
 import {
   confirmReservationPayment,
@@ -12,6 +12,7 @@ export const paymentConfirmSchema = z.object({
   paymentMethodId: z.string().uuid().optional(),
   providerPaymentId: z.string().trim().optional(),
   cardLast4: z.string().regex(/^\d{4}$/).optional(),
+  vehiclePlate: z.string().trim().min(2).optional(),
   simulateFailure: z.boolean().optional().default(false),
 });
 
@@ -34,6 +35,7 @@ export const confirmPayment = asyncHandler(async (req, res) => {
 
   const result = await confirmReservationPayment(req.body.reservationId, req.user, {
     paymentMethodId: req.body.paymentMethodId,
+    vehiclePlate: req.body.vehiclePlate,
   });
   res.json({
     ...result,
@@ -57,6 +59,7 @@ export const confirmPaymentByParam = asyncHandler(async (req, res) => {
 
   const result = await confirmReservationPayment(req.params.reservationId, req.user, {
     paymentMethodId: req.body?.paymentMethodId,
+    vehiclePlate: req.body?.vehiclePlate,
   });
   res.json({
     ...result,

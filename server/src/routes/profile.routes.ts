@@ -1,6 +1,6 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import {
-  activeReservation,
+  activeReservations,
   createPaymentMethod,
   createVehicle,
   deletePaymentMethod,
@@ -26,7 +26,7 @@ export const profileRouter = Router();
 
 profileRouter.get("/", authenticate, profile);
 profileRouter.put("/", authenticate, validate({ body: updateProfileSchema }), updateProfile);
-profileRouter.get("/active-reservation", authenticate, activeReservation);
+profileRouter.get("/active-reservations", authenticate, activeReservations);
 profileRouter.get("/reservations", authenticate, reservations);
 profileRouter.get("/payments", authenticate, payments);
 profileRouter.get("/vehicles", authenticate, listVehicles);

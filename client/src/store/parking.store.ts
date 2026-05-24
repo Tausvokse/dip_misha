@@ -5,7 +5,7 @@ import type { BillingQuote, ParkingSpot, Reservation } from "@/types/parking.typ
 
 type ParkingState = {
   spots: ParkingSpot[];
-  activeReservation: Reservation | null;
+  activeReservations: Reservation[];
   activeQuote: BillingQuote | null;
   isLoading: boolean;
   selectedSpot: ParkingSpot | null;
@@ -13,14 +13,16 @@ type ParkingState = {
   setSpots: (spots: ParkingSpot[]) => void;
   upsertSpot: (spot: ParkingSpot) => void;
   fetchSpots: () => Promise<void>;
-  createLock: (spot: ParkingSpot, durationMinutes: number) => Promise<Reservation>;
-  clearActiveReservation: () => void;
-  fetchActiveReservation: () => Promise<void>;
+  createLock: (spot: ParkingSpot, durationMinutes: number, startTime?: string) => Promise<Reservation>;
+  clearActiveReservation: (id: string) => void;
+  completeActiveReservation: (id: string) => void;
+  fetchActiveReservations: () => Promise<void>;
+  extendReservation: (id: string, durationMinutes: number) => Promise<void>;
 };
 
 export const useParkingStore = create<ParkingState>((set, get) => ({
   spots: [],
-  activeReservation: null,
+  activeReservations: [],
   activeQuote: null,
   isLoading: false,
   selectedSpot: null,
@@ -40,44 +42,67 @@ export const useParkingStore = create<ParkingState>((set, get) => ({
       set({ isLoading: false });
     }
   },
-  fetchActiveReservation: async () => {
+  fetchActiveReservations: async () => {
     try {
-      const { data } = await api.get("/profile/active-reservation");
-      if (data.reservation) {
-        set({ activeReservation: data.reservation });
-        if (data.reservation.spot) {
-          get().upsertSpot(data.reservation.spot);
-        }
+      const { data } = await api.get("/profile/active-reservations");
+      if (data.reservations) {
+        set({ activeReservations: data.reservations });
+        data.reservations.forEach((reservation: Reservation) => {
+          if (reservation.spot) {
+            get().upsertSpot(reservation.spot);
+          }
+        });
       } else {
-        set({ activeReservation: null });
+        set({ activeReservations: [] });
       }
     } catch (error) {
-      console.error("Failed to fetch active reservation", error);
+      console.error("Failed to fetch active reservations", error);
     }
   },
-  createLock: async (spot, durationMinutes) => {
+  createLock: async (spot, durationMinutes, startTime) => {
     const { data } = await lockSpot({
       spotId: spot.id,
       durationMinutes,
+      startTime,
     });
 
     if (data.reservation.spot) {
       get().upsertSpot(data.reservation.spot);
     }
 
-    set({
-      activeReservation: data.reservation,
+    set((state) => ({
+      activeReservations: [...state.activeReservations.filter((r) => r.id !== data.reservation.id), data.reservation],
       activeQuote: data.quote ?? null,
-      selectedSpot: null,
-    });
+    }));
 
     return data.reservation;
   },
-  clearActiveReservation: async () => {
-    const current = get().activeReservation;
+  clearActiveReservation: async (id) => {
+    const current = get().activeReservations.find(r => r.id === id);
     if (current?.status === "PENDING_PAYMENT") {
       await unlockSpot(current.id).catch(() => undefined);
     }
-    set({ activeReservation: null, activeQuote: null });
+    set((state) => ({ 
+      activeReservations: state.activeReservations.filter(r => r.id !== id),
+      activeQuote: null 
+    }));
+  },
+  completeActiveReservation: (id) => {
+    set((state) => ({ 
+      activeReservations: state.activeReservations.map(r => 
+        r.id === id ? { ...r, status: "RESERVED" } : r
+      ), 
+      activeQuote: null 
+    }));
+  },
+  extendReservation: async (id, durationMinutes) => {
+    const { data } = await api.post(`/reservations/${id}/extend`, { durationMinutes });
+    if (data.reservation) {
+      set((state) => ({
+        activeReservations: state.activeReservations.map(r => 
+          r.id === data.reservation.id ? data.reservation : r
+        )
+      }));
+    }
   },
 }));

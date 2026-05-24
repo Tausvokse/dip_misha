@@ -57,7 +57,7 @@ export function ReservationsPage() {
         
         {isLoading ? (
           <div className="flex h-[40vh] items-center justify-center">
-            <Spinner size="lg" />
+            <Spinner />
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
